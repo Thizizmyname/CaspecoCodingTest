@@ -3,6 +3,9 @@
  '      1      Ge några förslag på hur man skulle kunna förbättra denna kod. Rangordna dem i viktighetsordning.
  '
  '------------------------------------------------------------------------------------
+
+ ' This comment is only included to produce a pull request to be reviewed.
+ ' All comments on improvements will be placed as a PR review.
  
 
 Public Function SumPeriods(ByVal fromDate As Date, ByVal toDate As Date, ByVal summering As String, ByVal const_ As String, ByVal type As Integer)
