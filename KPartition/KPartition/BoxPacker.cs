@@ -14,12 +14,12 @@ namespace KPartition
      * This provides a simple, fast alternative but might provide a large approximation error
      * from the theoretical optimal solution.
      *
-     * This solution, utilises a priority queue to obtain the Box with the least weight.
-     * This would provide a worst case complexity of O(n log n)
+     * This solution, utilise a priority queue to obtain the Box with the least weight.
+     * Given n articles being partitions into k boxes, this would provide a worst case complexity of O(n log k)
      * Unfortunately, .net does not provide a priority queue, or the underlying data structures
      * (e.g. binomial heap) usually used, So instead of spending longer time implementing a example structure,
      * or installing external dependencies, a simple solution based on a list is used which raises the
-     * worst case complexity to O(n^2)
+     * worst case complexity to O(n*k)
      *
      * There are solutions that have a lower approximation error, even a pseudo-polynomial solution
      * using dynamic programming, (although the one I looked at entails an exponential memory usage).
