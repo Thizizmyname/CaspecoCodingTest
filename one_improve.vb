@@ -9,9 +9,14 @@
 ' In this example I have encapsulated everything as a SumClass to illustrate the separation of a Rapport (Class of tmpRapport)
 ' and the rest of implementation.
 
-' This implementation is using enums to separate the different unique properties between the summation types.
-' Although, since there quite a few, this should probably be refactored once again into polymorphic classes intsead of enum and multiple switchcases.
-' All Extracted methods are below SumPeriods
+' This implementation is using a polymorhpic class to separate the different unique properties between the summation types.
+' All Extracted methods for sunType are in a separate file.
+
+' Disclaimer:
+' I have never worked in VB before and as this is just a code snippet of a larger system, I have had no way of
+' checking for syntactical or logical errors. Expect faults in the code or my reasoning.
+
+imports SumType
 
 Public Class SumClass
 
@@ -19,15 +24,15 @@ Public Class SumClass
     Public Function ParseToEnum(Byval summering As String) As SumType
         Select Case summering
             Case "Dag"
-                Return SumType.SumDay
+                Return New SumType.SumDay
             Case "Vecka"
-                Return SumType.SumWeek
+                Return New SumType.SumWeek
             Case "Månad"
-                Return SumType.SumMonth
+                Return New SumType.SumMonth
             Case "År"
-                Return SumType.SumYear
+                Return New SumType.SumYear
             Case Else
-                Return SumType.Invalid
+                Return New SumType.Invalid
         End Select
     End Function
 
@@ -66,39 +71,12 @@ Public Class SumClass
 
             Dim firstDayOfRange = sumType.CalcFirstDay(fromDate)
 
-            If sumType is SumType.Day Then                
-                If periods > 10 Then
-                    progress.ShowProgress()
-                End If
+            sumType.ShowProgress()
+
+            If sumType is Not Invalid Then
 
                 If rbSelectDays.Checked Then
-                    For Each datum As Date In dateList
-                        If IgnoreDate(datum) Then
-                            addToLists(datum, datum, const_)
-                            tmpPeriod += 1
-                        End If
-                    Next
-                Else
-                    For day As Integer = 0 To periods
-                        If IgnoreDate(fromDate.AddDays(day)) Then
-                            Dim startDate As Date = sumType.DateofPeriod(firstDayOfRange, day)
-                            ' While the DateofPeriod call is generalized enough to work for Days aswell, it seemed silly to calculate it when known
-                            Dim endDate As Date = startDate 'sumType.DateofPeriod(firstDayOfRange, day+1).AddDays(-1)
-                            tmpRapport.datesForGraph.Add(startDate.Day & "/" & startDate.Month & "-" & startDate.Year)
-                            addToLists(startDate, endDate, const_)
-                            tmpPeriod += 1
-                        End If
-                        progress.Tick()
-                    Next
-                End If
-
-
-            ' sumType is not SumType.Day
-            ElseIf sumType is Not Invalid Then
-                progress.ShowProgress()
-
-                If rbSelectDays.Checked Then
-                    sumType.ErrorRangedSummationOnSelectDays()
+                    sumType.OnSelectedDays(dateList, tmpPeriod)
 
                 Else    
                     For period As Integer = 0 To periods
@@ -106,16 +84,18 @@ Public Class SumClass
                             Dim startDate As Date = sumType.DateofPeriod(firstDayOfRange, period)
                             Dim endDate As Date = sumType.DateofPeriod(firstDayOfRange, period+1).AddDays(-1)
 
-                            With ws.Range("b1").Offset(startRow + period, 0)
-                                .SetBorderLeft(2, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
-                                .SetBorderRight(2, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
-                                .SetBorderBottom(1, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
-                                .SetFont(boldFont)
-                                .Cell.tag = New Object() {startDate, endDate}
-                                .Value = sumType.DateName(startdate)
-                                .SetBGColor(frmUI.currentTheme.LineHeaderColor)
-                                .SetFontColor(frmUI.currentTheme.LineHeaderTextColor)
-                            End With
+                            if sumType.Ranged Then
+                                With ws.Range("b1").Offset(startRow + period, 0)
+                                    .SetBorderLeft(2, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
+                                    .SetBorderRight(2, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
+                                    .SetBorderBottom(1, frmUI.currentTheme.BorderColor, TableViewCellStyle.BorderStyle.Continuous)
+                                    .SetFont(boldFont)
+                                    .Cell.tag = New Object() {startDate, endDate}
+                                    .Value = sumType.DateName(startdate)
+                                    .SetBGColor(frmUI.currentTheme.LineHeaderColor)
+                                    .SetFontColor(frmUI.currentTheme.LineHeaderTextColor)
+                                End With
+                            End If
                             tmpRapport.datesForGraph.Add(sumType.DateName(date))
                             addToLists(startDate, endDate, const_)
                             tmpPeriod += 1
@@ -128,7 +108,7 @@ Public Class SumClass
             Dim extrarows As Integer = renderTable(tmpPeriod - 1, startRow, summering)
             rowForReport = startRow + tmpPeriod + rowsBetweenReports
 
-            If sumType is SumType.Day Then
+            If Not sumType.Ranged Then
                 rowForReport += extrarows
             End If
             progress.Close()
@@ -142,169 +122,10 @@ End Class
 
 
 
-'-------------------------------
-'
-'   Polymorphic class
-'
-'-------------------------------
-
-Public MustInherit Class SumType
-
-    Private rangeError As String
-    Private dateInterval As DateInterval
-
-    Public Sub New(error As String, interval As DateInterval)
-      rangeError = error
-      dateInterval = interval
-    End Sub
-
-    Public ReadOnly Property DateInterval As DateInterval
-        Get
-            Return dateInterval
-        End Get
-    End Property
-
-    Public MustOverride Function CalcFirstDay(ByVal fromDate As Date) As Date
-    Public MustOverride Function DateInterval() As DateInterval
-    Public MustOverride Function DateofPeriod(ByVal FirstDate As Date, ByVal period As Integer) As Date
-    Public MustOverride Function DateName(ByVal date As Date) As String
-
-
-    Public Overridable Function IgnoreDate(Byval fromDate As Date, ByVal period As Integer) As Boolean
-        Return True
-    End Function
-    Public Overridable Function IgnoreDate(Byval datum As Date) As Boolean
-        Return True
-    End Function
-
-    Public NotOverridable Sub ErrorRangedSummationOnSelectDays(ws As Object)
-        With ws.Range("b1").Offset(startRow, 0)
-            .SetColumnSpan(11)
-            .Value = rangeError & " FUNGERAR INTE MED ENSTAKA DAGAR"
-            .SetBGColor(Color.White)
-            .SetFontColor(Color.Black)
-            .SetFont(boldFont)
-        End With
-    End Sub
-
-
-
-    Public Class SumDay
-        Inherits SumType
-        Public Sub New()
-            MyBase.New("", DateInterval.Day)
-        End Sub
-
-        Overrides Function CalcFirstDay(ByVal fromDate As Date) As Date
-            Return fromDate
-        End Function
-
-        Overrides Function DateofPeriod(ByVal firstDate As Date, ByVal period As Integer) As Date
-            Return firstDate.AddDays(period)
-        End Function
-
-        Overrides Function DateName(ByVal date As Date) As String
-            Return startDate.Day & "/" & date.Month & "-" & startDate.Year
-        End Function
-
-        Overrides Function IgnoreDate(Byval fromDate As Date, ByVal period As Integer) As Boolean
-            Return IgnoreDate(fromDate.AddDays(day))
-        End Function
-        Overrides Function IgnoreDate(Byval datum As Date) As Boolean
-            Return tmpRapport.weekDaysSelected.Contains(DatePart(DateInterval.Weekday, datum, FirstDayOfWeek.Monday,FirstWeekOfYear.FirstFourDays))
-        End Function
-    End Class
-
-    Public Class SumWeek
-        Inherits SumType
-        Public Sub New()
-            MyBase.New("VECKOSUMMERING", DateInterval.WeekOfYear)
-        End Sub
-
-        Overrides Function CalcFirstDay(ByVal fromDate As Date) As Date
-            Dim currDay = DatePart(DateInterval.Weekday, fromDate, FirstDayOfWeek.Monday, FirstWeekOfYear.FirstFourDays)
-            Dim weekadjust As Integer = 1 - currDay
-            Return fromDate.AddDays(weekadjust)
-        End Function
-
-        Overrides Function DateofPeriod(ByVal firstDate As Date, ByVal period As Integer) As Date
-            Return firstDate.AddDays(period * 7)
-        End Function
-
-        Overrides Function DateName(ByVal date As Date) As String
-            Return DatePart(DateInterval.WeekOfYear, date, FirstDayOfWeek.Monday, FirstWeekOfYear.FirstFourDays) & "-" & startDate.Year
-        End Function
-    End Class
-
-    Public Class SumMonth
-        Inherits SumType
-        Public Sub New()
-            MyBase.New("MÅNADSSUMMERING", DateInterval.Month)
-        End Sub
-
-        Overrides Function CalcFirstDay(ByVal fromDate As Date) As Date
-            Return New Date(fromDate.Year, fromDate.Month, 1)
-        End Function
-
-        Overrides Function DateofPeriod(ByVal firstDate As Date, ByVal period As Integer) As Date
-            Return firstDate.AddMonths(period)
-        End Function
-
-        Overrides Function DateName(ByVal date As Date) As String
-            Return MonthName(date.Month) & "-" & startDate.Year
-        End Function
-    End Class
-
-    Public Class SumYear
-        Inherits SumType
-        Public Sub New()
-            MyBase.New("ÅRSSUMMERING", DateInterval.Year)
-        End Sub
-
-        Overrides Function CalcFirstDay(ByVal fromDate As Date) As Date
-            Dim firstYear As Integer = DatePart(DateInterval.Year, fromDate, FirstDayOfWeek.Monday, FirstWeekOfYear.FirstFourDays)
-            Return New Date(firstYear, 1, 1)
-        End Function
-
-        Overrides Function DateofPeriod(ByVal firstDate As Date, ByVal period As Integer) As Date
-            Return firstDate.AddMonths(period * 12)
-        End Function
-
-        Overrides Function DateName(ByVal date As Date) As String
-            Return date.Year
-        End Function
-    End Class
-
-    Public Class Invalid
-        Inherits SumType
-        Public Sub New()
-            MyBase.New("", DateInterval.Day)
-        End Sub
-
-        Overrides Function CalcFirstDay(ByVal fromDate As Date) As Date
-            Return New Date(2001, 1, 1)
-        End Function
-
-        Overrides Function DateofPeriod(ByVal firstDate As Date, ByVal period As Integer) As Date
-            Return New Date(2001, 1, 1)
-        End Function
-
-        Overrides Function DateName(ByVal date As Date) As String
-            Return "Invalid SumType"
-        End Function
-    End Class
-End Class
-
-
-
-
-
 Public Class Rapport
-    'Data members
+    'Class members
 
     Public Sub Clear()
-    ' Note: none of these except datesForGraph are seemingly accessed or modified in this function,
-    ' It should not be this functions responsility to modify perhaps indirectly related data members.
         snittnotaSum = 0
         blgGuestSum = 0
         blgSeatSum = 0
