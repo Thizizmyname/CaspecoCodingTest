@@ -1,5 +1,6 @@
 # CaspecoCodingTest
 Coding tests from Caspeco
+All replies are provided as individual pull requests.
 
 The sample code were provided in pure text.
 Some formating and assumtions on code language have been made since the language was not provided.
